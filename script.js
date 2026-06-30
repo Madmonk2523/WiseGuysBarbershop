@@ -90,7 +90,67 @@ document.querySelectorAll(".reveal").forEach((element) => {
   revealObserver.observe(element);
 });
 
+const galleryTrack = document.querySelector(".gallery-track");
+const gallerySlides = [...document.querySelectorAll(".gallery-slide")];
+const galleryPreviousButton = document.querySelector(".gallery-prev");
+const galleryNextButton = document.querySelector(".gallery-next");
+const currentGalleryLabel = document.querySelector(".gallery-current");
+const galleryProgress = document.querySelector(".gallery-progress span");
+let activeGalleryIndex = 0;
+let galleryScrollFrame;
+
+const updateGalleryStatus = (index) => {
+  activeGalleryIndex = Math.max(0, Math.min(index, gallerySlides.length - 1));
+  currentGalleryLabel.textContent = String(activeGalleryIndex + 1).padStart(2, "0");
+  galleryProgress.style.width = `${((activeGalleryIndex + 1) / gallerySlides.length) * 100}%`;
+};
+
+const showGalleryPhoto = (index) => {
+  const nextIndex = (index + gallerySlides.length) % gallerySlides.length;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  galleryTrack.scrollTo({
+    left: gallerySlides[nextIndex].offsetLeft - gallerySlides[0].offsetLeft,
+    behavior: reducedMotion ? "auto" : "smooth",
+  });
+  updateGalleryStatus(nextIndex);
+};
+
+galleryPreviousButton.addEventListener("click", () => {
+  showGalleryPhoto(activeGalleryIndex - 1);
+});
+
+galleryNextButton.addEventListener("click", () => {
+  showGalleryPhoto(activeGalleryIndex + 1);
+});
+
+galleryTrack.addEventListener(
+  "scroll",
+  () => {
+    cancelAnimationFrame(galleryScrollFrame);
+    galleryScrollFrame = requestAnimationFrame(() => {
+      const closestIndex = gallerySlides.reduce((closest, slide, index) => {
+        const startOffset = gallerySlides[0].offsetLeft;
+        const closestDistance = Math.abs(
+          gallerySlides[closest].offsetLeft - startOffset - galleryTrack.scrollLeft
+        );
+        const currentDistance = Math.abs(slide.offsetLeft - startOffset - galleryTrack.scrollLeft);
+        return currentDistance < closestDistance ? index : closest;
+      }, 0);
+      updateGalleryStatus(closestIndex);
+    });
+  },
+  { passive: true }
+);
+
+galleryTrack.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    event.preventDefault();
+    showGalleryPhoto(activeGalleryIndex + (event.key === "ArrowRight" ? 1 : -1));
+  }
+});
+
 const reviewTrack = document.querySelector(".review-track");
+const reviewViewport = document.querySelector(".review-viewport");
 const reviewCards = [...document.querySelectorAll(".review-card")];
 const previousButton = document.querySelector(".review-prev");
 const nextButton = document.querySelector(".review-next");
@@ -103,6 +163,9 @@ const showReview = (index) => {
   reviewTrack.style.transform = `translateX(-${activeReviewIndex * 100}%)`;
   currentReviewLabel.textContent = String(activeReviewIndex + 1).padStart(2, "0");
   reviewProgress.style.width = `${((activeReviewIndex + 1) / reviewCards.length) * 100}%`;
+  requestAnimationFrame(() => {
+    reviewViewport.style.height = `${reviewCards[activeReviewIndex].offsetHeight}px`;
+  });
 };
 
 previousButton.addEventListener("click", () => showReview(activeReviewIndex - 1));
@@ -129,4 +192,9 @@ reviewTrack.addEventListener(
   { passive: true }
 );
 
+window.addEventListener("resize", () => {
+  reviewViewport.style.height = `${reviewCards[activeReviewIndex].offsetHeight}px`;
+});
+
+showReview(0);
 yearElement.textContent = new Date().getFullYear();
